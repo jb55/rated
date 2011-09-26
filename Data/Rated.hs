@@ -16,8 +16,8 @@ data Rated a = Rate Int a
              deriving (Show)
 
 instance Eq (Rated a) where
-  Junk == Junk = True
-  Junk == _    = True
+  Junk == Junk               = True
+  Junk == _                  = True
   (Rate r1 _) == (Rate r2 _) = r1 == r2
 
 instance Ord (Rated a) where
@@ -31,10 +31,12 @@ instance Ord (Rated a) where
 
 instance Functor Rated where
   f `fmap` (Rate r a) = Rate r (f a)
-  f `fmap` Junk = Junk
+  f `fmap` Junk       = Junk
 
 instance Applicative Rated where
-  (Rate r1 f) <*> (Rate r2 x) = Rate r2 (f x)
+  _ <*> Junk                  = Junk
+  Junk <*> q                  = Junk
+  (Rate r1 f) <*> (Rate r2 x) = Rate (r1 + r2) (f x)
   pure = Rate 0
 
 instance Alternative Rated where
@@ -44,14 +46,23 @@ instance Alternative Rated where
   q1   <|> q2   = q1 `max` q2
   empty = Junk
 
+instance Monad Rated where
+  Junk >>= f           = Junk
+  m1@(Rate r1 a) >>= f = case f a of
+                           Rate r2 b -> Rate (r1 + r2) b
+                           Junk      -> Junk
+  return = pure
+
+
 fromRate :: Rated a -> a
 fromRate (Rate r a) = a
 
 fromRated :: a -> Rated a -> a
-fromRated x r = fromRate (r <|> pure x)
+fromRated _ (Rate r a) = a
+fromRated x _          = x
 
-changeRating :: Rated a -> (Int -> Int) -> Rated a
-changeRating (Rate r a) f = Rate (f r) a
+changeRating :: (Int -> Int) -> Rated a -> Rated a
+changeRating f (Rate r a) = Rate (f r) a
 
 setRating :: Rated a -> Int -> Rated a
 setRating (Rate r a) i = Rate i a
